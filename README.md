@@ -169,6 +169,58 @@ API docs: http://localhost:8000/docs
 
 ---
 
+## Sample Data
+
+Thư mục `sample_data/` chứa dữ liệu mẫu để test end-to-end mà không cần tài liệu thật từ dự án.
+
+### `sample_data/BRD_Authentication_Sample.md`
+
+BRD mẫu đầy đủ cho module **Authentication & User Management**, gồm:
+
+| Section | Nội dung |
+|---|---|
+| Business Rules | 19 rules (BR-ACC, BR-PWD, BR-SES, BR-OTP) |
+| Acceptance Criteria | 27 AC cho 4 chức năng (Đăng ký, Đăng nhập, Quên mật khẩu, Refresh Token) |
+| Validation Rules | Đầy đủ field validation + error message |
+| Edge Cases | 13 edge case thực tế (double submit, clock skew, token reuse…) |
+| Error Handling | Bảng HTTP status code + response format |
+
+**Dùng để test flow BRD upload:**
+
+```bash
+# 1. Khởi động server
+uvicorn app.main:app --reload
+
+# 2. Upload BRD sample (khi endpoint /api/brd/upload được implement)
+curl -X POST http://localhost:8000/api/brd/upload \
+  -F "file=@sample_data/BRD_Authentication_Sample.md" \
+  -F "project_id=CLARION-MVP"
+```
+
+**Dùng để test phân tích ticket:**
+
+```json
+// POST /api/ticket/analyze — sample payload
+{
+  "ticket_id": "AUTH-001",
+  "title": "Đăng ký tài khoản bằng email",
+  "user_story": "As a new user, I want to register with email so that I can access the system.",
+  "acceptance_criteria": [
+    "AC1: Hệ thống cho phép đăng ký với email và password",
+    "AC2: Gửi OTP xác nhận sau khi đăng ký"
+  ],
+  "business_rules": [
+    "BR1: Mỗi email chỉ đăng ký 1 tài khoản",
+    "BR2: Mật khẩu tối thiểu 8 ký tự"
+  ],
+  "project_id": "CLARION-MVP"
+}
+```
+
+> Clarion sẽ so sánh ticket này với BRD đã upload, phát hiện các AC còn thiếu (error handling, edge case) và suggest cải thiện dựa trên Business Rules trong BRD.
+
+---
+
 ## Chạy Tests
 
 ```bash
