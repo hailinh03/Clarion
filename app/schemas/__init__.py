@@ -1,0 +1,1 @@
+# Clarion — Pydantic schemas
