@@ -34,10 +34,10 @@ def _build_llm():
     Khởi tạo LLM cho tác vụ phân tích ticket (tác vụ nặng — cần reasoning tốt).
     Provider đọc từ LLM_PROVIDER, model đọc từ ANALYZE_LLM_MODEL.
 
-    Default: Groq + deepseek-r1-distill-llama-70b (free tier).
+    Default: Groq + openai/gpt-oss-120b (free tier).
     """
     provider = os.getenv("LLM_PROVIDER", "groq").lower()
-    model = os.getenv("ANALYZE_LLM_MODEL", "deepseek-r1-distill-llama-70b")
+    model = os.getenv("ANALYZE_LLM_MODEL", "openai/gpt-oss-120b")
 
     logger.info(f"Building analyze LLM: provider={provider} model={model}")
 
@@ -142,13 +142,23 @@ async def run_analyze_chain(
     """
     chain = get_analyze_chain()
 
+    context_text = format_context_chunks(context_chunks)
+    if not context_chunks:
+        context_text += (
+            "\n\n⚠️ LƯU Ý ĐẶC BIỆT: Hệ thống không tìm thấy bất kỳ tài liệu tham chiếu nào "
+            "trong Qdrant cho project_id này. "
+            "BẠN TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA RA (hallucinate) các con số cụ thể (ví dụ: 30 giây, "
+            "10 phút, 5 lần, tối đa 3 lần...) trong các trường improved_ac hoặc missing_items. "
+            "Thay vào đó, hãy dùng cụm từ '[Cần PM cung cấp thông số]'."
+        )
+
     # Chuẩn bị input variables cho prompt template
     prompt_input: Dict[str, str] = {
         "title": ticket.title,
         "user_story": ticket.user_story or "(Không có user story)",
         "acceptance_criteria": _join_list(ticket.acceptance_criteria, "Không có AC"),
         "business_rules": _join_list(ticket.business_rules, "Không có Business Rule"),
-        "context_chunks": format_context_chunks(context_chunks),
+        "context_chunks": context_text,
     }
 
     logger.info(f"Running analyze chain for ticket={ticket.ticket_id}")

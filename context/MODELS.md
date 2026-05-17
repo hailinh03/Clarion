@@ -52,9 +52,9 @@ Cần reasoning tốt, hiểu business context, output JSON chính xác.
 | `meta-llama/Llama-3.3-70B-Instruct` | HuggingFace | HF Inference API (free tier) | ⭐ Mạnh, follow instruction tốt |
 | `google/gemma-3-27b-it` | HuggingFace | HF Inference API (free tier) | Tốt cho tiếng Việt |
 | `mistralai/Mistral-7B-Instruct-v0.3` | Groq | Groq free tier (nhanh) | Nhẹ hơn nhưng rate limit cao |
-| `deepseek-r1-distill-llama-70b` | Groq | Groq free tier | Reasoning tốt |
+| `openai/gpt-oss-120b` | Groq | Groq free tier | Reasoning tốt |
 
-> **Khuyến nghị hiện tại:** `Qwen2.5-72B-Instruct` qua HuggingFace Inference API hoặc `deepseek-r1-distill-llama-70b` qua Groq (nhanh hơn).
+> **Khuyến nghị hiện tại:** `Qwen2.5-72B-Instruct` qua HuggingFace Inference API hoặc `openai/gpt-oss-120b` qua Groq (nhanh hơn).
 
 ---
 
@@ -67,6 +67,7 @@ Prompt rõ ràng, schema cố định → không cần model quá mạnh, ưu ti
 |---|---|---|
 | `Qwen2.5-7B-Instruct` | HuggingFace / Groq | Nhanh, đủ dùng cho gen có cấu trúc |
 | `meta-llama/Llama-3.1-8B-Instruct` | Groq free | Rất nhanh |
+| `openai/gpt-oss-120b` | Groq free | Rất mạnh, support cấu trúc tốt |
 | `gemma-7b-it` | Groq free | Nhẹ, tốt cho JSON output |
 
 ---
@@ -91,7 +92,7 @@ def get_analyze_llm():
     
     elif provider == "groq":
         from langchain_groq import ChatGroq
-        return ChatGroq(model="deepseek-r1-distill-llama-70b")
+        return ChatGroq(model="openai/gpt-oss-120b")
     
     else:  # huggingface (default free)
         endpoint = HuggingFaceEndpoint(
@@ -107,7 +108,7 @@ def get_generation_llm():
     
     if provider == "groq":
         from langchain_groq import ChatGroq
-        return ChatGroq(model="llama-3.1-8b-instant")
+        return ChatGroq(model="openai/gpt-oss-120b")
     
     else:  # huggingface
         endpoint = HuggingFaceEndpoint(

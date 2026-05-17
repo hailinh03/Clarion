@@ -30,7 +30,7 @@ Clarion giúp PM / BA viết Jira ticket chất lượng hơn và tự động h
 |---|---|---|
 | API | **FastAPI** + Uvicorn | Async, tự gen OpenAPI docs |
 | AI Orchestration | **LangChain** | Chain, parser, multi-provider LLM |
-| LLM (free) | **Groq** — `deepseek-r1-distill-llama-70b` | Free tier, reasoning tốt |
+| LLM (free) | **Groq** — `openai/gpt-oss-120b` | Free tier, reasoning tốt |
 | Embedding (free) | **BAAI/bge-m3** local | Multilingual Anh+Việt, dim=1024 |
 | Vector DB | **Qdrant** Docker local | Self-host, filter theo metadata |
 | Task Queue | **Celery + Redis** | Xử lý gen task/TC async |
@@ -51,8 +51,8 @@ clarion/
 │   ├── services/
 │   │   ├── embedding.py          # ✅ BAAI/bge-m3 local, singleton, embed_batch/single
 │   │   ├── qdrant_client.py      # ✅ Kết nối Qdrant, init 3 collections, upsert/search
-│   │   ├── retrieval.py          # 🔲 search context từ Qdrant
-│   │   ├── analyzer.py           # 🔲 LLM phân tích ticket
+│   │   ├── retrieval.py          # ✅ search context từ Qdrant
+│   │   ├── analyzer.py           # ✅ LLM phân tích ticket
 │   │   ├── task_generator.py     # 🔲 LLM sinh tech task
 │   │   ├── testcase_generator.py # 🔲 LLM sinh test case
 │   │   └── coverage.py           # 🔲 cosine similarity, gap report
@@ -163,9 +163,9 @@ API docs: http://localhost:8000/docs
 | Method | Endpoint | Mô tả | Status |
 |---|---|---|---|
 | `GET` | `/health` | Liveness probe | ✅ |
-| `POST` | `/api/ticket/analyze` | Phân tích ticket, trả về AnalysisResult | 🔲 |
-| `POST` | `/api/ticket/approve` | Approve ticket, kích hoạt gen task + TC | 🔲 |
-| `POST` | `/api/brd/upload` | Upload BRD PDF/Word → chunk → embed → Qdrant | 🔲 |
+| `POST` | `/api/ticket/analyze` | Phân tích ticket, trả về AnalysisResult | ✅ |
+| `POST` | `/api/ticket/approve` | Approve ticket, kích hoạt gen task + TC | ✅ |
+| `POST` | `/api/brd/upload` | Upload BRD PDF/Word → chunk → embed → Qdrant | ✅ |
 
 ---
 
@@ -289,9 +289,9 @@ POST /api/ticket/approve
 - [x] `embedding.py` — BAAI/bge-m3 local, singleton, normalize
 - [x] `qdrant_client.py` — kết nối, init 3 collections, upsert/search
 - [x] `analyze_chain.py` — Groq + LangChain + JsonOutputParser
-- [ ] `retrieval.py` — build context từ Qdrant cho prompt
-- [ ] `api/ticket.py` — implement endpoint analyze + approve
-- [ ] `api/brd.py` — upload, chunk, embed, upsert BRD
+- [x] `retrieval.py` — build context từ Qdrant cho prompt
+- [x] `api/ticket.py` — implement endpoint analyze + approve
+- [x] `api/brd.py` — upload, chunk, embed, upsert BRD
 - [ ] `task_chain.py` + `task_generator.py` — gen tech task
 - [ ] `testcase_chain.py` + `testcase_generator.py` — gen test case
 - [ ] `coverage.py` — cosine similarity + gap report

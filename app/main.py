@@ -56,10 +56,11 @@ app.add_middleware(
 )
 
 # ── Routers — sẽ được mount khi implement từng module ────────────
-# from app.api.ticket import router as ticket_router
-# from app.api.brd import router as brd_router
-# app.include_router(ticket_router, prefix="/api", tags=["Ticket"])
-# app.include_router(brd_router, prefix="/api", tags=["BRD"])
+from app.api.ticket import router as ticket_router
+from app.api.brd import router as brd_router
+
+app.include_router(ticket_router, prefix="/api", tags=["Ticket"])
+app.include_router(brd_router, prefix="/api", tags=["BRD"])
 
 
 # ── Health check ─────────────────────────────────────────────────
