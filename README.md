@@ -53,12 +53,12 @@ clarion/
 │   │   ├── qdrant_client.py      # ✅ Kết nối Qdrant, init 3 collections, upsert/search
 │   │   ├── retrieval.py          # ✅ search context từ Qdrant
 │   │   ├── analyzer.py           # ✅ LLM phân tích ticket
-│   │   ├── task_generator.py     # 🔲 LLM sinh tech task
+│   │   ├── task_generator.py     # ✅ LLM sinh tech task
 │   │   ├── testcase_generator.py # 🔲 LLM sinh test case
 │   │   └── coverage.py           # 🔲 cosine similarity, gap report
 │   ├── chains/
 │   │   ├── analyze_chain.py      # ✅ ChatPromptTemplate | Groq | JsonOutputParser
-│   │   ├── task_chain.py         # 🔲 chain sinh tech task
+│   │   ├── task_chain.py         # ✅ chain sinh tech task
 │   │   └── testcase_chain.py     # 🔲 chain sinh test case
 │   ├── schemas/
 │   │   ├── ticket.py             # ✅ TicketInput, TicketJSON
@@ -292,7 +292,7 @@ POST /api/ticket/approve
 - [x] `retrieval.py` — build context từ Qdrant cho prompt
 - [x] `api/ticket.py` — implement endpoint analyze + approve
 - [x] `api/brd.py` — upload, chunk, embed, upsert BRD
-- [ ] `task_chain.py` + `task_generator.py` — gen tech task
+- [x] `task_chain.py` + `task_generator.py` — gen tech task
 - [ ] `testcase_chain.py` + `testcase_generator.py` — gen test case
 - [ ] `coverage.py` — cosine similarity + gap report
 - [ ] Jira webhook integration

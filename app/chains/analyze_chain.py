@@ -149,7 +149,9 @@ async def run_analyze_chain(
             "trong Qdrant cho project_id này. "
             "BẠN TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA RA (hallucinate) các con số cụ thể (ví dụ: 30 giây, "
             "10 phút, 5 lần, tối đa 3 lần...) trong các trường improved_ac hoặc missing_items. "
-            "Thay vào đó, hãy dùng cụm từ '[Cần PM cung cấp thông số]'."
+            "Thay vào đó, hãy dùng cụm từ '[Cần PM cung cấp thông số]'.\n"
+            "QUAN TRỌNG VỀ ĐIỂM SỐ: Vì ticket này không có bất kỳ tài liệu BRD nào để đối chiếu (thiếu Traceability), "
+            "độ rủi ro khi code là cực kỳ cao. Hãy đánh giá score RẤT THẤP (tối đa không quá 40 điểm) để cảnh báo PM."
         )
 
     # Chuẩn bị input variables cho prompt template
