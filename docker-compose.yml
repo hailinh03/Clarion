@@ -19,8 +19,9 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
-      # Không cần API key cho local dev
-      QDRANT__SERVICE__API_KEY: ""
+      # Không cần API key cho local dev — KHÔNG set QDRANT__SERVICE__API_KEY
+      # (set thành "" sẽ bật auth với empty key → lỗi 401)
+      QDRANT__LOG_LEVEL: INFO
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
       interval: 10s
