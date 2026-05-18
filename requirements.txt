@@ -27,8 +27,11 @@ huggingface-hub==0.26.2
 qdrant-client==1.12.1
 
 # --- Async Task Queue ---
-celery==5.4.0
-redis==5.2.0                    # Celery broker
+aio-pika==9.4.1
+
+# --- Database ---
+sqlalchemy==2.0.35
+asyncpg==0.30.0
 
 # --- Data Validation ---
 pydantic==2.10.3

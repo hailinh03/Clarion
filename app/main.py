@@ -26,6 +26,14 @@ async def lifespan(app: FastAPI):
     from app.services.qdrant_client import init_collections
     init_collections()
 
+    # Khởi tạo các bảng PostgreSQL
+    from app.db.database import engine, Base
+    from app.db.models import TaskStatus  # Đảm bảo model đã được import
+    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("   PostgreSQL        : Tables created/verified")
+
     # TODO: warm-up local embedding model (SentenceTransformer)
 
     yield  # ← server is running

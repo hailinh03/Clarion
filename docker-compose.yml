@@ -28,18 +28,37 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Redis (Celery broker + result backend) ──────────────────────
-  redis:
-    image: redis:7.4-alpine
-    container_name: clarion-redis
+  # ── RabbitMQ (Celery broker) ────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: clarion-rabbitmq
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI port (guest/guest)
     volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── PostgreSQL (Database chính & Lưu trạng thái Task) ───────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: clarion-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: clarion
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d clarion"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,5 +66,7 @@ services:
 volumes:
   qdrant_data:
     driver: local
-  redis_data:
+  rabbitmq_data:
+    driver: local
+  postgres_data:
     driver: local

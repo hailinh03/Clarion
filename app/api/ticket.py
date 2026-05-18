@@ -11,10 +11,9 @@ from app.schemas.analysis import AnalysisResult
 from app.services.analyzer import analyze_ticket as analyzer_analyze_ticket
 from app.services.embedding import embed_single
 from app.services.qdrant_client import upsert_approved_ticket
-from app.workers.celery_app import celery_app
+from app.services.rabbitmq_client import publish_event
 
 router = APIRouter()
-
 
 @router.post("/ticket/analyze", response_model=AnalysisResult)
 async def analyze_ticket(ticket: TicketInput) -> AnalysisResult:
@@ -24,13 +23,12 @@ async def analyze_ticket(ticket: TicketInput) -> AnalysisResult:
     """
     return await analyzer_analyze_ticket(ticket)
 
-
 @router.post("/ticket/approve")
 async def approve_ticket(ticket: TicketJSON):
     """
     Approve ticket:
     1. Embed toàn bộ nội dung ticket và upsert vào Qdrant (approved_tickets).
-    2. Gửi task sinh tech task và test case cho Celery chạy ngầm.
+    2. Phát event lên RabbitMQ để sinh tech task và test case chạy ngầm.
     """
     # 1. Tổng hợp text
     parts = [ticket.title]
@@ -58,9 +56,8 @@ async def approve_ticket(ticket: TicketJSON):
     
     await run_in_threadpool(do_upsert)
 
-    # [Bước B] Đẩy heavy tasks (gen task, gen TC) qua Celery
+    # [Bước B] Publish event ticket.approved lên RabbitMQ
     ticket_dict = ticket.model_dump()
-    celery_app.send_task("tasks.gen_tech_tasks", args=[ticket_dict])
-    celery_app.send_task("tasks.gen_test_cases", args=[ticket_dict])
+    await publish_event("ticket.approved", ticket_dict)
 
     return {"status": "processing", "ticket_id": ticket.ticket_id}
