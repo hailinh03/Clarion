@@ -10,6 +10,15 @@
 
 ---
 
+## 🤖 AI Agent Guide
+If you are an AI coding assistant (e.g. Cursor, Copilot, Antigravity) working on this repository, please read and adhere to the guidelines and specifications stored in the [context/](file:///home/ubuntu/innovation/Clarion/context) directory:
+*   [context/ARCHITECTURE.md](file:///home/ubuntu/innovation/Clarion/context/ARCHITECTURE.md): Comprehensive system architecture, database integrations (PostgreSQL & Qdrant), and background task flows.
+*   [context/MODELS.md](file:///home/ubuntu/innovation/Clarion/context/MODELS.md): Pre-configured LLM models, parameters, and recommended providers (e.g. Google Gemini).
+*   [context/RULES.md](file:///home/ubuntu/innovation/Clarion/context/RULES.md): Coding rules, strict formatting conventions, and behavior patterns.
+*   [context/OVERVIEW.md](file:///home/ubuntu/innovation/Clarion/context/OVERVIEW.md): Overview of Clarion features and project scope.
+
+---
+
 ## Mục tiêu
 
 Clarion giúp PM / BA viết Jira ticket chất lượng hơn và tự động hóa công việc lặp lại của Dev + QA:
