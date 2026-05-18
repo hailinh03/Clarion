@@ -3,8 +3,13 @@ Clarion — Ticket API
 POST /api/ticket/analyze  — phân tích ticket khi PM viết
 POST /api/ticket/approve  — approve ticket, kích hoạt gen task / test case
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
+from app.db.database import get_db
+from app.db.models import TaskStatus
 
 from app.schemas.ticket import TicketInput, TicketJSON
 from app.schemas.analysis import AnalysisResult
@@ -24,11 +29,12 @@ async def analyze_ticket(ticket: TicketInput) -> AnalysisResult:
     return await analyzer_analyze_ticket(ticket)
 
 @router.post("/ticket/approve")
-async def approve_ticket(ticket: TicketJSON):
+async def approve_ticket(ticket: TicketJSON, db: AsyncSession = Depends(get_db)):
     """
     Approve ticket:
     1. Embed toàn bộ nội dung ticket và upsert vào Qdrant (approved_tickets).
-    2. Phát event lên RabbitMQ để sinh tech task và test case chạy ngầm.
+    2. Ghi nhận trạng thái vào PostgreSQL.
+    3. Phát event lên RabbitMQ để sinh tech task và test case chạy ngầm.
     """
     # 1. Tổng hợp text
     parts = [ticket.title]
@@ -50,14 +56,55 @@ async def approve_ticket(ticket: TicketJSON):
             ticket_id=ticket.ticket_id,
             vector=vector,
             project_id=ticket.project_id,
-            sprint="current",  # Có thể bổ sung field sprint vào TicketJSON sau
+            sprint="current",
             text=ticket_text
         )
     
     await run_in_threadpool(do_upsert)
 
-    # [Bước B] Publish event ticket.approved lên RabbitMQ
+    # [Bước B] Ghi nhận 2 Task vào DB
+    task_tech_id = f"tech_tasks_{ticket.ticket_id}"
+    task_test_id = f"test_cases_{ticket.ticket_id}"
+    
+    db.add(TaskStatus(id=task_tech_id, task_name="gen_tech_tasks", status="STARTED"))
+    db.add(TaskStatus(id=task_test_id, task_name="gen_test_cases", status="STARTED"))
+    await db.commit()
+
+    # [Bước C] Publish event ticket.approved lên RabbitMQ
     ticket_dict = ticket.model_dump()
     await publish_event("ticket.approved", ticket_dict)
 
-    return {"status": "processing", "ticket_id": ticket.ticket_id}
+    return {
+        "status": "processing", 
+        "ticket_id": ticket.ticket_id,
+        "message": "Đã đẩy task tạo Tech Task và Test Case xuống background"
+    }
+
+@router.get("/ticket/status/{ticket_id}")
+async def get_ticket_status(ticket_id: str, db: AsyncSession = Depends(get_db)):
+    """Lấy trạng thái xử lý ngầm của Ticket (Tech Tasks và Test Cases)."""
+    task_tech_id = f"tech_tasks_{ticket_id}"
+    task_test_id = f"test_cases_{ticket_id}"
+    
+    result_tech = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_tech_id))
+    task_tech = result_tech.scalars().first()
+    
+    result_test = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_test_id))
+    task_test = result_test.scalars().first()
+    
+    if not task_tech and not task_test:
+        raise HTTPException(status_code=404, detail="Không tìm thấy task xử lý cho ticket này")
+        
+    return {
+        "ticket_id": ticket_id,
+        "tech_tasks": {
+            "status": task_tech.status if task_tech else "NOT_FOUND",
+            "result": task_tech.result if task_tech else None,
+            "error": task_tech.error if task_tech else None
+        },
+        "test_cases": {
+            "status": task_test.status if task_test else "NOT_FOUND",
+            "result": task_test.result if task_test else None,
+            "error": task_test.error if task_test else None
+        }
+    }

@@ -17,22 +17,22 @@ def _build_generation_llm():
 
     if provider == "groq":
         from langchain_groq import ChatGroq
-        return ChatGroq(model=model, temperature=0, max_tokens=2048)
+        return ChatGroq(model=model, temperature=0, max_tokens=3000)
 
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=model, temperature=0, max_tokens=2048)
+        return ChatAnthropic(model=model, temperature=0, max_tokens=3000)
 
     if provider == "openai":
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=model, temperature=0, max_tokens=2048)
+        return ChatOpenAI(model=model, temperature=0, max_tokens=3000)
 
     from langchain_community.llms import HuggingFaceEndpoint
     from langchain_community.chat_models.huggingface import ChatHuggingFace
     endpoint = HuggingFaceEndpoint(
         repo_id=model,
         task="text-generation",
-        max_new_tokens=2048,
+        max_new_tokens=3000,
     )
     return ChatHuggingFace(llm=endpoint)
 

@@ -6,6 +6,9 @@ import asyncio
 import json
 import uuid
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Nạp biến môi trường từ .env NGAY LẬP TỨC
+
 from loguru import logger
 import aio_pika
 
@@ -26,12 +29,28 @@ async def handle_tech_tasks(message: aio_pika.IncomingMessage):
     async with message.process():
         payload = json.loads(message.body.decode())
         ticket_id = payload.get("ticket_id", "unknown")
+        task_db_id = f"tech_tasks_{ticket_id}"
         logger.info(f"[Consumer] Bắt đầu sinh Tech Tasks cho ticket_id={ticket_id}")
-        try:
-            tasks = await gen_tech_tasks(payload)
-            logger.info(f"[Consumer] Hoàn thành sinh {len(tasks)} Tech Tasks cho ticket_id={ticket_id}")
-        except Exception as e:
-            logger.error(f"[Consumer] Lỗi khi sinh Tech Tasks cho ticket={ticket_id}: {e}")
+        
+        async with AsyncSessionLocal() as db:
+            try:
+                tasks = await gen_tech_tasks(payload)
+                logger.info(f"[Consumer] Hoàn thành sinh {len(tasks)} Tech Tasks cho ticket_id={ticket_id}")
+                
+                result = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_db_id))
+                task_record = result.scalars().first()
+                if task_record:
+                    task_record.status = "SUCCESS"
+                    task_record.result = json.dumps({"tasks_generated": len(tasks)})
+                    await db.commit()
+            except Exception as e:
+                logger.error(f"[Consumer] Lỗi khi sinh Tech Tasks cho ticket={ticket_id}: {e}")
+                result = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_db_id))
+                task_record = result.scalars().first()
+                if task_record:
+                    task_record.status = "FAILED"
+                    task_record.error = str(e)
+                    await db.commit()
 
 async def handle_test_cases(message: aio_pika.IncomingMessage):
     """Lắng nghe event 'ticket.approved' để sinh Test Cases + Coverage Check."""
@@ -39,34 +58,54 @@ async def handle_test_cases(message: aio_pika.IncomingMessage):
         payload = json.loads(message.body.decode())
         ticket_id = payload.get("ticket_id", "unknown")
         project_id = payload.get("project_id", "unknown")
+        task_db_id = f"test_cases_{ticket_id}"
+        
         logger.info(f"[Consumer] Bắt đầu sinh Test Cases cho ticket_id={ticket_id}")
-        try:
-            # 1. Gen test cases
-            test_cases = await gen_test_cases(payload)
-            
-            # 2. Coverage check
-            ac_list = payload.get("acceptance_criteria", [])
-            coverage_report = coverage_check(ac_list, test_cases)
-            
-            # 3. Embed & Upsert
-            if test_cases:
-                tc_texts = [f"{tc.title} {' '.join(tc.steps)} {tc.expected_result}" for tc in test_cases]
-                tc_vectors = embed_batch(tc_texts)
+        
+        async with AsyncSessionLocal() as db:
+            try:
+                # 1. Gen test cases
+                test_cases = await gen_test_cases(payload)
                 
-                for tc, vector in zip(test_cases, tc_vectors):
-                    upsert_test_case(
-                        tc_id=tc.id,
-                        vector=vector,
-                        ticket_id=ticket_id,
-                        ac_ref=tc.ac_ref,
-                        tc_type=tc.type,
-                        title=tc.title,
-                        project_id=project_id,
-                    )
+                # 2. Coverage check
+                ac_list = payload.get("acceptance_criteria", [])
+                coverage_report = coverage_check(ac_list, test_cases)
+                
+                # 3. Embed & Upsert
+                if test_cases:
+                    tc_texts = [f"{tc.title} {' '.join(tc.steps)} {tc.expected_result}" for tc in test_cases]
+                    tc_vectors = embed_batch(tc_texts)
                     
-            logger.info(f"[Consumer] Hoàn thành sinh {len(test_cases)} Test Cases, Coverage: {coverage_report['coverage_percentage']}%")
-        except Exception as e:
-            logger.error(f"[Consumer] Lỗi khi sinh Test Cases cho ticket={ticket_id}: {e}")
+                    for tc, vector in zip(test_cases, tc_vectors):
+                        upsert_test_case(
+                            tc_id=tc.id,
+                            vector=vector,
+                            ticket_id=ticket_id,
+                            ac_ref=tc.ac_ref,
+                            tc_type=tc.type,
+                            title=tc.title,
+                            project_id=project_id,
+                        )
+                        
+                logger.info(f"[Consumer] Hoàn thành sinh {len(test_cases)} Test Cases, Coverage: {coverage_report['coverage_percentage']}%")
+                
+                result = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_db_id))
+                task_record = result.scalars().first()
+                if task_record:
+                    task_record.status = "SUCCESS"
+                    task_record.result = json.dumps({
+                        "test_cases_generated": len(test_cases),
+                        "coverage": coverage_report
+                    })
+                    await db.commit()
+            except Exception as e:
+                logger.error(f"[Consumer] Lỗi khi sinh Test Cases cho ticket={ticket_id}: {e}")
+                result = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_db_id))
+                task_record = result.scalars().first()
+                if task_record:
+                    task_record.status = "FAILED"
+                    task_record.error = str(e)
+                    await db.commit()
 
 async def handle_brd_process(message: aio_pika.IncomingMessage):
     """Lắng nghe event 'brd.uploaded' để nhúng vector BRD."""
