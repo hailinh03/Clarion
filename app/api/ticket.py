@@ -98,6 +98,8 @@ async def approve_ticket(ticket: TicketJSON, db: AsyncSession = Depends(get_db))
         "message": "Đã đẩy task tạo Tech Task và Test Case xuống background"
     }
 
+import json
+
 @router.get("/ticket/status/{ticket_id}")
 async def get_ticket_status(ticket_id: str, db: AsyncSession = Depends(get_db)):
     """Lấy trạng thái xử lý ngầm của Ticket (Tech Tasks và Test Cases)."""
@@ -113,16 +115,31 @@ async def get_ticket_status(ticket_id: str, db: AsyncSession = Depends(get_db)):
     if not task_tech and not task_test:
         raise HTTPException(status_code=404, detail="Không tìm thấy task xử lý cho ticket này")
         
+    # Parse kết quả từ JSON string thành Dict/List để Frontend nhận được JSON chuẩn
+    tech_result = None
+    if task_tech and task_tech.result:
+        try:
+            tech_result = json.loads(task_tech.result)
+        except Exception:
+            tech_result = task_tech.result
+            
+    test_result = None
+    if task_test and task_test.result:
+        try:
+            test_result = json.loads(task_test.result)
+        except Exception:
+            test_result = task_test.result
+        
     return {
         "ticket_id": ticket_id,
         "tech_tasks": {
             "status": task_tech.status if task_tech else "NOT_FOUND",
-            "result": task_tech.result if task_tech else None,
+            "result": tech_result,
             "error": task_tech.error if task_tech else None
         },
         "test_cases": {
             "status": task_test.status if task_test else "NOT_FOUND",
-            "result": task_test.result if task_test else None,
+            "result": test_result,
             "error": task_test.error if task_test else None
         }
     }

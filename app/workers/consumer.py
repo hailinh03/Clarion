@@ -41,7 +41,10 @@ async def handle_tech_tasks(message: aio_pika.IncomingMessage):
                 task_record = result.scalars().first()
                 if task_record:
                     task_record.status = "SUCCESS"
-                    task_record.result = json.dumps({"tasks_generated": len(tasks)})
+                    task_record.result = json.dumps({
+                        "tasks_count": len(tasks),
+                        "tasks": [t.model_dump() for t in tasks]
+                    }, ensure_ascii=False)
                     await db.commit()
             except Exception as e:
                 logger.error(f"[Consumer] Lỗi khi sinh Tech Tasks cho ticket={ticket_id}: {e}")
@@ -94,9 +97,10 @@ async def handle_test_cases(message: aio_pika.IncomingMessage):
                 if task_record:
                     task_record.status = "SUCCESS"
                     task_record.result = json.dumps({
-                        "test_cases_generated": len(test_cases),
-                        "coverage": coverage_report
-                    })
+                        "test_cases_count": len(test_cases),
+                        "coverage": coverage_report,
+                        "test_cases": [tc.model_dump() for tc in test_cases]
+                    }, ensure_ascii=False)
                     await db.commit()
             except Exception as e:
                 logger.error(f"[Consumer] Lỗi khi sinh Test Cases cho ticket={ticket_id}: {e}")
