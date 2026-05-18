@@ -16,6 +16,7 @@ langchain-community==0.3.7
 
 # --- LLM Providers (chỉ cần Groq cho free tier) ---
 langchain-groq==0.2.1
+langchain-google-genai==2.0.1
 
 # --- Embedding local (BAAI/bge-m3) ---
 sentence-transformers==3.3.1

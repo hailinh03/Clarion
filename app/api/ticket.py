@@ -62,12 +62,30 @@ async def approve_ticket(ticket: TicketJSON, db: AsyncSession = Depends(get_db))
     
     await run_in_threadpool(do_upsert)
 
-    # [Bước B] Ghi nhận 2 Task vào DB
+    # [Bước B] Ghi nhận 2 Task vào DB (hỗ trợ update nếu đã tồn tại)
     task_tech_id = f"tech_tasks_{ticket.ticket_id}"
     task_test_id = f"test_cases_{ticket.ticket_id}"
     
-    db.add(TaskStatus(id=task_tech_id, task_name="gen_tech_tasks", status="STARTED"))
-    db.add(TaskStatus(id=task_test_id, task_name="gen_test_cases", status="STARTED"))
+    # Xử lý tech task
+    result_tech = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_tech_id))
+    task_tech = result_tech.scalars().first()
+    if task_tech:
+        task_tech.status = "STARTED"
+        task_tech.result = None
+        task_tech.error = None
+    else:
+        db.add(TaskStatus(id=task_tech_id, task_name="gen_tech_tasks", status="STARTED"))
+        
+    # Xử lý test case
+    result_test = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_test_id))
+    task_test = result_test.scalars().first()
+    if task_test:
+        task_test.status = "STARTED"
+        task_test.result = None
+        task_test.error = None
+    else:
+        db.add(TaskStatus(id=task_test_id, task_name="gen_test_cases", status="STARTED"))
+        
     await db.commit()
 
     # [Bước C] Publish event ticket.approved lên RabbitMQ

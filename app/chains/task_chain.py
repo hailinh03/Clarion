@@ -27,6 +27,14 @@ def _build_generation_llm():
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(model=model, temperature=0, max_tokens=3000)
 
+    if provider == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=model,
+            temperature=0,
+            google_api_key=os.getenv("GOOGLE_API_KEY")
+        )
+
     from langchain_community.llms import HuggingFaceEndpoint
     from langchain_community.chat_models.huggingface import ChatHuggingFace
     endpoint = HuggingFaceEndpoint(

@@ -57,6 +57,14 @@ def _build_llm():
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(model=model, temperature=0, max_tokens=4096)
 
+    if provider == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=model,
+            temperature=0,
+            google_api_key=os.getenv("GOOGLE_API_KEY")
+        )
+
     # Default fallback: HuggingFace Inference API
     from langchain_community.llms import HuggingFaceEndpoint
     from langchain_community.chat_models.huggingface import ChatHuggingFace
