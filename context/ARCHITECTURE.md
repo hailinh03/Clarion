@@ -6,9 +6,10 @@
 | Layer | Tech | Lý do |
 |---|---|---|
 | API Framework | **FastAPI** | Async native, tự gen OpenAPI docs, dễ tích hợp webhook Jira |
+| Database | **PostgreSQL** | Lưu trữ trạng thái và kết quả của các background task qua SQLAlchemy asyncpg |
 | AI Orchestration | **LangChain** | Chain prompt, quản lý memory, tích hợp nhiều LLM provider |
 | Vector Database | **Qdrant** | Self-hostable, hỗ trợ filter theo metadata, free tier tốt |
-| Task Queue | **Celery + Redis** | Xử lý gen task/test case async sau khi approve |
+| Task Queue | **RabbitMQ** (via `aio-pika`) | Hàng đợi tin nhắn xử lý các tác vụ nền bất đồng bộ hiệu năng cao |
 
 ### Embedding Model
 | Dùng cho | Model | Chiều | Nguồn |
@@ -91,27 +92,26 @@ return AnalysisResult {
 
 ```
 PM bấm Approve → POST /api/ticket/approve
-    ↓
-[Bước A] Embed ticket đã approve → Qdrant upsert (collection: approved_tickets)
-    ↓
-[Bước B] Parse ticket → TicketJSON {
-    title, user_story, ac_list, business_rules, edge_cases
-}
-    ↓
-[Song song qua Celery]
-    ├── Task: gen_tech_tasks(ticket_json)
-    │       ↓ LLM → JSON array of TechTask
-    │       ↓ Jira API: tạo sub-task
     │
-    └── Task: gen_test_cases(ticket_json)
-            ↓ LLM → JSON array of TestCase (có ac_ref)
-            ↓ coverage_check(ac_list, test_cases)
-                ├── embed_batch(ac_list)
-                ├── embed_batch(test_case_titles)
-                ├── cosine_similarity_matrix()
-                ├── threshold = 0.75
-                └── gap_report: [AC chưa được cover]
-            ↓ Jira API: attach test case + gap report vào ticket
+    ├─► [Bước A] Embed ticket đã approve → Qdrant upsert (collection: approved_tickets)
+    │
+    ├─► [Bước B] Ghi nhận 2 bản ghi TaskStatus (gen_tech_tasks & gen_test_cases) ở trạng thái 'STARTED' vào PostgreSQL
+    │
+    └─► [Bước C] Publish event 'ticket.approved' lên RabbitMQ
+            │
+            ├─► Consumer: handle_tech_tasks
+            │       └─► LLM gen_tech_tasks → cập nhật Postgres thành SUCCESS/FAILED (kèm JSON TechTask)
+            │
+            └─► Consumer: handle_test_cases
+                    ├─► LLM gen_test_cases
+                    ├─► coverage_check(ac_list, test_cases, br_list, ec_list)
+                    │       ├── embed_batch(ac_list)
+                    │       ├── embed_batch(test_case_titles)
+                    │       ├── cosine_similarity_matrix()
+                    │       ├── threshold (đọc từ env COVERAGE_THRESHOLD, default 0.75)
+                    │       └── gap_report: AC/BR/EC chưa được cover
+                    ├─► Embed & Upsert các TestCase được sinh vào Qdrant (test_cases)
+                    └─► Cập nhật Postgres thành SUCCESS/FAILED (kèm JSON TestCase & Coverage Report)
 ```
 
 ---
@@ -121,36 +121,39 @@ PM bấm Approve → POST /api/ticket/approve
 ```
 clarion/
 ├── app/
-│   ├── main.py                  # FastAPI entrypoint
+│   ├── main.py                  # FastAPI entrypoint, lifespan hooks
 │   ├── api/
-│   │   ├── ticket.py            # POST /ticket/analyze, /ticket/approve
-│   │   └── brd.py               # POST /brd/upload
+│   │   ├── ticket.py            # POST /api/ticket/analyze, /ticket/approve, GET /ticket/status/{ticket_id}
+│   │   └── brd.py               # POST /api/brd/upload, GET /brd/status/{task_id}
+│   ├── db/
+│   │   ├── database.py          # Cấu hình SQLAlchemy async session & engine (PostgreSQL)
+│   │   └── models.py            # Định nghĩa bảng task_status lưu trạng thái tác vụ nền
 │   ├── services/
-│   │   ├── embedding.py         # embed_single, embed_batch
-│   │   ├── retrieval.py         # search Qdrant, build context
+│   │   ├── embedding.py         # embed_single, embed_batch (SentenceTransformer local)
+│   │   ├── qdrant_client.py     # kết nối Qdrant, init collections, upsert & search
+│   │   ├── rabbitmq_client.py   # kết nối và publish_event lên RabbitMQ
+│   │   ├── retrieval.py         # search Qdrant, build context cho LLM prompt
 │   │   ├── analyzer.py          # LLM phân tích ticket
+│   │   ├── brd_processor.py     # parsing (PDF, DOCX, TXT) và chunking BRD
 │   │   ├── task_generator.py    # LLM sinh tech task
 │   │   ├── testcase_generator.py# LLM sinh test case
-│   │   └── coverage.py          # cosine similarity, gap report
+│   │   └── coverage.py          # tính cosine similarity giữa AC/BR/EC và test case, xuất gap report
 │   ├── chains/
-│   │   ├── analyze_chain.py     # LangChain chain cho phân tích
-│   │   ├── task_chain.py
-│   │   └── testcase_chain.py
+│   │   ├── analyze_chain.py     # LangChain chain cho phân tích ticket (ambiguity, missing items)
+│   │   ├── task_chain.py        # LangChain chain sinh tech task
+│   │   └── testcase_chain.py    # LangChain chain sinh test case
 │   ├── schemas/
-│   │   ├── ticket.py            # Pydantic models
-│   │   ├── analysis.py
-│   │   ├── task.py
-│   │   └── testcase.py
+│   │   ├── ticket.py            # Pydantic models cho input ticket
+│   │   ├── analysis.py          # Pydantic models cho kết quả phân tích
+│   │   ├── task.py              # Pydantic models cho TechTask
+│   │   └── testcase.py          # Pydantic models cho TestCase
 │   ├── prompts/                 # Prompt templates (xem PROMPT_TEMPLATES.md)
 │   └── workers/
-│       └── celery_app.py        # Async task processing
-├── tests/
-├── .env
-├── OVERVIEW.md
-├── ARCHITECTURE.md
-├── MODELS.md
-├── RULES.md
-└── PROMPT_TEMPLATES.md
+│       └── consumer.py          # RabbitMQ event consumer lắng nghe events & xử lý background jobs
+├── tests/                       # Thư mục unit tests (mock external services)
+├── .env.example                 # Template cấu hình các biến môi trường
+├── docker-compose.yml           # Định nghĩa các container service: Qdrant, RabbitMQ, PostgreSQL
+└── requirements.txt             # Định nghĩa dependencies của dự án
 ```
 
 ---

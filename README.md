@@ -38,13 +38,14 @@ Clarion giúp PM / BA viết Jira ticket chất lượng hơn và tự động h
 | Layer | Công nghệ | Ghi chú |
 |---|---|---|
 | API | **FastAPI** + Uvicorn | Async, tự gen OpenAPI docs |
-| AI Orchestration | **LangChain** | Chain, parser, multi-provider LLM |
+| Database | **PostgreSQL** | Lưu trữ trạng thái và kết quả xử lý của các background task |
+| AI Orchestration | **LangChain** | Chain, parser, multi-provider LLM (Groq, Anthropic, OpenAI, etc.) |
 | LLM (free) | **Groq** — `openai/gpt-oss-120b` | Free tier, reasoning tốt |
 | Embedding (free) | **BAAI/bge-m3** local | Multilingual Anh+Việt, dim=1024 |
 | Vector DB | **Qdrant** Docker local | Self-host, filter theo metadata |
-| Task Queue | **Celery + Redis** | Xử lý gen task/TC async |
+| Task Queue | **RabbitMQ** (via `aio-pika`) | Hàng đợi tin nhắn xử lý tác vụ sinh task/TC bất đồng bộ |
 
-> **100% free để chạy:** Groq free tier + local embedding + Qdrant local Docker. Không cần credit card.
+> **100% free để chạy:** Groq free tier + local embedding + Qdrant, RabbitMQ & PostgreSQL local Docker. Không cần credit card.
 
 ---
 
@@ -55,39 +56,43 @@ clarion/
 ├── app/
 │   ├── main.py                   # FastAPI entrypoint, lifespan hooks
 │   ├── api/
-│   │   ├── ticket.py             # POST /api/ticket/analyze, /ticket/approve
-│   │   └── brd.py                # POST /api/brd/upload
+│   │   ├── ticket.py             # POST /api/ticket/analyze, /ticket/approve, GET /ticket/status/{ticket_id}
+│   │   └── brd.py                # POST /api/brd/upload, GET /brd/status/{task_id}
+│   ├── db/
+│   │   ├── database.py           # ✅ Cấu hình SQLAlchemy async session & engine (PostgreSQL)
+│   │   └── models.py             # ✅ Định nghĩa bảng task_status lưu trạng thái tác vụ nền
 │   ├── services/
 │   │   ├── embedding.py          # ✅ BAAI/bge-m3 local, singleton, embed_batch/single
 │   │   ├── qdrant_client.py      # ✅ Kết nối Qdrant, init 3 collections, upsert/search
+│   │   ├── rabbitmq_client.py    # ✅ Kết nối RabbitMQ, publish_event
 │   │   ├── retrieval.py          # ✅ search context từ Qdrant
 │   │   ├── analyzer.py           # ✅ LLM phân tích ticket
+│   │   ├── brd_processor.py      # ✅ Xử lý parse (PDF, DOCX, TXT) và chunk BRD
 │   │   ├── task_generator.py     # ✅ LLM sinh tech task
-│   │   ├── testcase_generator.py # 🔲 LLM sinh test case
-│   │   └── coverage.py           # 🔲 cosine similarity, gap report
+│   │   ├── testcase_generator.py # ✅ LLM sinh test case
+│   │   └── coverage.py           # ✅ tính cosine similarity giữa AC/BR/EC và test case, xuất gap report
 │   ├── chains/
 │   │   ├── analyze_chain.py      # ✅ ChatPromptTemplate | Groq | JsonOutputParser
 │   │   ├── task_chain.py         # ✅ chain sinh tech task
-│   │   └── testcase_chain.py     # 🔲 chain sinh test case
+│   │   └── testcase_chain.py     # ✅ chain sinh test case
 │   ├── schemas/
 │   │   ├── ticket.py             # ✅ TicketInput, TicketJSON
 │   │   ├── analysis.py           # ✅ AnalysisResult, AmbiguousItem, MissingItem
 │   │   ├── task.py               # ✅ TechTask
 │   │   └── testcase.py           # ✅ TestCase
 │   ├── prompts/
-│   │   ├── analyze_ticket.py     # ✅ System + user prompt cho phân tích
+│   │   ├── analyze_ticket.py     # ✅ System + user prompt cho phân tích (chống hallucination)
 │   │   ├── gen_tech_task.py      # ✅ Prompt sinh tech task
 │   │   └── gen_testcase.py       # ✅ Prompt sinh test case
 │   └── workers/
-│       ├── celery_app.py         # ✅ Celery + Redis config
-│       └── tasks.py              # ✅ task_gen_tech_tasks, task_gen_test_cases
+│       └── consumer.py           # ✅ RabbitMQ consumer lắng nghe event và chạy background jobs (sync/async)
 ├── tests/
 │   ├── test_main.py              # ✅ Health check smoke test
 │   ├── test_embedding.py         # ✅ 8 test cases, mock model
 │   ├── test_qdrant_client.py     # ✅ 15 test cases, mock Qdrant
 │   └── test_analyze_chain.py     # ✅ 10 test cases, mock LLM
 ├── .env.example                  # Template cấu hình
-├── docker-compose.yml            # Qdrant + Redis
+├── docker-compose.yml            # Qdrant + RabbitMQ + PostgreSQL
 └── requirements.txt
 ```
 
@@ -112,7 +117,7 @@ clarion/
 ### Yêu cầu
 
 - Python 3.11+
-- Docker Desktop (để chạy Qdrant + Redis)
+- Docker Desktop (để chạy Qdrant, RabbitMQ và PostgreSQL)
 - [Groq API key](https://console.groq.com) (free)
 
 ### 1. Clone và cài dependencies
@@ -136,34 +141,50 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Mở `.env`, chỉnh sửa:
+Mở `.env`, chỉnh sửa và cấu hình đầy đủ:
 
 ```env
 LLM_PROVIDER=groq
-GROQ_API_KEY=gsk_your_key_here      # Lấy tại console.groq.com (free)
+GROQ_API_KEY=gsk_your_key_here              # Lấy tại console.groq.com (free)
 
 EMBEDDING_PROVIDER=local
-EMBEDDING_MODEL=BAAI/bge-m3         # Download tự động lần đầu (~1.5GB)
+EMBEDDING_MODEL=BAAI/bge-m3                 # Download tự động lần đầu (~1.5GB)
 
-QDRANT_URL=http://localhost:6333    # Chạy qua Docker bên dưới
-QDRANT_API_KEY=                     # Để trống khi self-host
+QDRANT_URL=http://localhost:6333            # Chạy qua Docker bên dưới
+QDRANT_API_KEY=                             # Để trống khi self-host local
+
+# PostgreSQL & RabbitMQ
+CELERY_BROKER_URL=amqp://guest:guest@localhost:5672//  # RabbitMQ URL dùng chung
+DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@localhost:5432/clarion
 ```
 
-### 3. Khởi động Qdrant + Redis
+### 3. Khởi động các dịch vụ (Qdrant + RabbitMQ + PostgreSQL)
 
 ```bash
 docker compose up -d
 ```
 
-Kiểm tra Qdrant dashboard: http://localhost:6333/dashboard
+*   Kiểm tra Qdrant Dashboard: http://localhost:6333/dashboard
+*   Kiểm tra RabbitMQ Management: http://localhost:15672 (Mặc định: `guest` / `guest`)
+*   Kiểm tra PostgreSQL port: `5432`
 
-### 4. Chạy API server
+### 4. Chạy API Server
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
 API docs: http://localhost:8000/docs
+
+### 5. Chạy background worker (RabbitMQ Consumer)
+
+Trong một terminal mới (đã activate virtualenv):
+
+```bash
+python -m app.workers.consumer
+```
+
+Background worker này sẽ chịu trách nhiệm sinh Technical Tasks, Test Cases và lưu trữ trạng thái tác vụ vào PostgreSQL cũng như lưu test case vector vào Qdrant.
 
 ---
 
@@ -173,8 +194,10 @@ API docs: http://localhost:8000/docs
 |---|---|---|---|
 | `GET` | `/health` | Liveness probe | ✅ |
 | `POST` | `/api/ticket/analyze` | Phân tích ticket, trả về AnalysisResult | ✅ |
-| `POST` | `/api/ticket/approve` | Approve ticket, kích hoạt gen task + TC | ✅ |
-| `POST` | `/api/brd/upload` | Upload BRD PDF/Word → chunk → embed → Qdrant | ✅ |
+| `POST` | `/api/ticket/approve` | Approve ticket, sinh tech task + TC chạy ngầm | ✅ |
+| `GET` | `/api/ticket/status/{ticket_id}` | Kiểm tra trạng thái/kết quả sinh task và TC của Ticket | ✅ |
+| `POST` | `/api/brd/upload` | Upload BRD PDF/Word/TXT → lưu tạm → RabbitMQ xử lý ngầm | ✅ |
+| `GET` | `/api/brd/status/{task_id}` | Kiểm tra trạng thái xử lý file BRD từ PostgreSQL | ✅ |
 
 ---
 
@@ -234,12 +257,12 @@ curl -X POST http://localhost:8000/api/brd/upload \
 
 ```bash
 # Chạy tất cả (không cần Qdrant server, không cần Groq key — toàn bộ đều mock)
-pytest tests/ -v
+.venv/bin/pytest tests/ -v
 
 # Chạy từng module
-pytest tests/test_embedding.py -v
-pytest tests/test_qdrant_client.py -v
-pytest tests/test_analyze_chain.py -v
+.venv/bin/pytest tests/test_embedding.py -v
+.venv/bin/pytest tests/test_qdrant_client.py -v
+.venv/bin/pytest tests/test_analyze_chain.py -v
 ```
 
 **Tất cả tests đều mock external services** (SentenceTransformer, QdrantClient, Groq) → chạy được trong CI/CD không cần tài nguyên thật.
@@ -266,18 +289,24 @@ POST /api/ticket/analyze
         }
 ```
 
-### Flow 2 — Sau khi approve (async Celery)
+### Flow 2 — Sau khi approve (async RabbitMQ + PostgreSQL)
 
 ```
 POST /api/ticket/approve
     │
     ├─► embed + upsert Qdrant (approved_tickets)
     │
-    └─► Celery tasks (song song):
-            ├─► gen_tech_tasks → TechTask[] → Jira sub-tasks
-            └─► gen_test_cases → TestCase[]
-                    └─► coverage_check (cosine sim AC ↔ TC)
-                            └─► gap_report: AC chưa cover
+    ├─► Tạo 2 bản ghi TaskStatus (gen_tech_tasks & gen_test_cases) ở trạng thái 'STARTED' trong PostgreSQL
+    │
+    └─► Publish event 'ticket.approved' lên RabbitMQ
+            │
+            ├─► Consumer: handle_tech_tasks (sinh tech tasks, cập nhật Postgres SUCCESS/FAILED)
+            │
+            └─► Consumer: handle_test_cases
+                    ├─► LLM gen test cases
+                    ├─► coverage_check (cosine similarity giữa AC/BR/EC và test cases)
+                    ├─► upsert các test case được sinh vào Qdrant (test_cases)
+                    └─► cập nhật PostgreSQL trạng thái và kết quả (SUCCESS/FAILED kèm coverage report)
 ```
 
 ---
@@ -302,8 +331,8 @@ POST /api/ticket/approve
 - [x] `api/ticket.py` — implement endpoint analyze + approve
 - [x] `api/brd.py` — upload, chunk, embed, upsert BRD
 - [x] `task_chain.py` + `task_generator.py` — gen tech task
-- [ ] `testcase_chain.py` + `testcase_generator.py` — gen test case
-- [ ] `coverage.py` — cosine similarity + gap report
+- [x] `testcase_chain.py` + `testcase_generator.py` — gen test case
+- [x] `coverage.py` — cosine similarity + gap report
 - [ ] Jira webhook integration
 - [ ] Dashboard chất lượng ticket theo sprint
 
@@ -313,11 +342,11 @@ POST /api/ticket/approve
 
 | File | Nội dung |
 |---|---|
-| [`OVERVIEW.md`](OVERVIEW.md) | Mục tiêu, luồng hoạt động, actors |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Tech stack, data flow, schema JSON, cấu trúc thư mục |
-| [`MODELS.md`](MODELS.md) | Danh sách model embedding + LLM, hướng dẫn switching |
-| [`RULES.md`](RULES.md) | Coding rules bắt buộc cho toàn project |
-| [`PROMPT_TEMPLATES.md`](PROMPT_TEMPLATES.md) | Prompt templates đầy đủ cho 3 tác vụ chính |
+| [`context/OVERVIEW.md`](context/OVERVIEW.md) | Mục tiêu, luồng hoạt động, actors |
+| [`context/ARCHITECTURE.md`](context/ARCHITECTURE.md) | Tech stack, data flow, schema JSON, cấu trúc thư mục |
+| [`context/MODELS.md`](context/MODELS.md) | Danh sách model embedding + LLM, hướng dẫn switching |
+| [`context/RULES.md`](context/RULES.md) | Coding rules bắt buộc cho toàn project |
+| [`context/PROMPT_TEMPLATES.md`](context/PROMPT_TEMPLATES.md) | Prompt templates đầy đủ cho 3 tác vụ chính |
 
 ---
 

@@ -72,51 +72,32 @@ Prompt rõ ràng, schema cố định → không cần model quá mạnh, ưu ti
 
 ---
 
-## Cấu hình LangChain — Switching model dễ dàng
+## Cấu hình LangChain — Switching model dễ dàng (xem app/chains/*_chain.py)
 
 ```python
-# app/services/llm_provider.py
-import os
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+# Việc xây dựng LLM được tích hợp trực tiếp trong các chain: app/chains/analyze_chain.py, app/chains/task_chain.py, app/chains/testcase_chain.py
+# Cho phép cấu hình qua các biến môi trường: LLM_PROVIDER, ANALYZE_LLM_MODEL, GENERATION_LLM_MODEL
 
-def get_analyze_llm():
-    provider = os.getenv("LLM_PROVIDER", "huggingface")
-    
-    if provider == "anthropic":
-        return ChatAnthropic(model="claude-3-5-sonnet-20241022")
-    
-    elif provider == "openai":
-        return ChatOpenAI(model="gpt-4o")
-    
-    elif provider == "groq":
-        from langchain_groq import ChatGroq
-        return ChatGroq(model="openai/gpt-oss-120b")
-    
-    else:  # huggingface (default free)
-        endpoint = HuggingFaceEndpoint(
-            repo_id="Qwen/Qwen2.5-72B-Instruct",
-            task="text-generation",
-            max_new_tokens=2048,
-        )
-        return ChatHuggingFace(llm=endpoint)
-
-def get_generation_llm():
-    """LLM nhẹ hơn cho gen task/test case"""
-    provider = os.getenv("LLM_PROVIDER", "huggingface")
+# Ví dụ logic xây dựng LLM:
+def _build_llm():
+    provider = os.getenv("LLM_PROVIDER", "groq").lower()
+    model = os.getenv("ANALYZE_LLM_MODEL", "openai/gpt-oss-120b")
     
     if provider == "groq":
         from langchain_groq import ChatGroq
-        return ChatGroq(model="openai/gpt-oss-120b")
-    
-    else:  # huggingface
-        endpoint = HuggingFaceEndpoint(
-            repo_id="Qwen/Qwen2.5-7B-Instruct",
-            task="text-generation",
-            max_new_tokens=2048,
-        )
-        return ChatHuggingFace(llm=endpoint)
+        return ChatGroq(model=model, temperature=0, max_tokens=4096)
+        
+    elif provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+        return ChatAnthropic(model=model, temperature=0, max_tokens=4096)
+        
+    elif provider == "openai":
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(model=model, temperature=0, max_tokens=4096)
+        
+    elif provider == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(model=model, temperature=0)
 ```
 
 ---
@@ -124,22 +105,28 @@ def get_generation_llm():
 ## .env mẫu
 
 ```env
-# LLM Provider: anthropic | openai | groq | huggingface
-LLM_PROVIDER=huggingface
+# LLM Config
+LLM_PROVIDER=groq
+ANALYZE_LLM_MODEL=openai/gpt-oss-120b
+GENERATION_LLM_MODEL=openai/gpt-oss-120b
 
 # API Keys (chỉ cần key của provider đang dùng)
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-GROQ_API_KEY=                    # free tại console.groq.com
-HUGGINGFACE_API_KEY=             # free tại huggingface.co/settings/tokens
+GROQ_API_KEY=gsk_your_key_here
+# ANTHROPIC_API_KEY=
+# OPENAI_API_KEY=
+# GOOGLE_API_KEY=
 
 # Embedding
 EMBEDDING_PROVIDER=local         # local | openai
 EMBEDDING_MODEL=BAAI/bge-m3      # dùng local free
 
-# Qdrant
+# Qdrant Vector DB
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=                  # để trống nếu self-host local
+
+# Task state & Queue (PostgreSQL & RabbitMQ)
+CELERY_BROKER_URL=amqp://guest:guest@localhost:5672//
+DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@localhost:5432/clarion
 
 # Coverage check
 COVERAGE_THRESHOLD=0.75

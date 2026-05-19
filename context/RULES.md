@@ -150,14 +150,16 @@ async def analyze_ticket(ticket: TicketInput) -> AnalysisResult:
 ```python
 # SAI — blocking call trong async endpoint
 @router.post("/ticket/approve")
-async def approve_ticket(ticket_id: str):
+async def approve_ticket(ticket: TicketJSON):
     result = sync_llm_call(...)  # block event loop
 
-# ĐÚNG — đẩy heavy task vào Celery worker
+# ĐÚNG — ghi nhận Task vào Postgres và đẩy heavy task vào RabbitMQ event bus
 @router.post("/ticket/approve")
-async def approve_ticket(ticket_id: str):
-    celery_app.send_task("tasks.process_approved_ticket", args=[ticket_id])
-    return {"status": "processing", "ticket_id": ticket_id}
+async def approve_ticket(ticket: TicketJSON, db: AsyncSession = Depends(get_db)):
+    db.add(TaskStatus(id=f"tech_tasks_{ticket.ticket_id}", task_name="gen_tech_tasks", status="STARTED"))
+    await db.commit()
+    await publish_event("ticket.approved", ticket.model_dump())
+    return {"status": "processing", "ticket_id": ticket.ticket_id}
 ```
 
 ---
