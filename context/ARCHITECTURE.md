@@ -22,8 +22,8 @@
 ### LLM
 | Tác vụ | Model ưu tiên | Model free thay thế |
 |---|---|---|
-| Phân tích ticket, detect mơ hồ, suggest cải thiện | `claude-3-5-sonnet` / `gpt-4o` | `openai/gpt-oss-120b` (Groq) |
-| Sinh tech task, sinh test case | `claude-3-5-haiku` / `gpt-4o-mini` | `openai/gpt-oss-120b` (Groq) |
+| Phân tích ticket, detect mơ hồ, suggest cải thiện | `claude-3-5-sonnet` / `gpt-4o` | `gemini-2.5-flash` (Google free - mặc định) / `openai/gpt-oss-120b` (Groq) |
+| Sinh tech task, sinh test case | `claude-3-5-haiku` / `gpt-4o-mini` | `gemini-2.5-flash` (Google free - mặc định) / `openai/gpt-oss-120b` (Groq) |
 
 > Xem chi tiết model free tại `MODELS.md`
 

@@ -39,13 +39,13 @@ Clarion giúp PM / BA viết Jira ticket chất lượng hơn và tự động h
 |---|---|---|
 | API | **FastAPI** + Uvicorn | Async, tự gen OpenAPI docs |
 | Database | **PostgreSQL** | Lưu trữ trạng thái và kết quả xử lý của các background task |
-| AI Orchestration | **LangChain** | Chain, parser, multi-provider LLM (Groq, Anthropic, OpenAI, etc.) |
-| LLM (free) | **Groq** — `openai/gpt-oss-120b` | Free tier, reasoning tốt |
+| AI Orchestration | **LangChain** | Chain, parser, multi-provider LLM (Google Gemini, Groq, Anthropic, OpenAI, etc.) |
+| LLM (free) | **Google** — `gemini-2.5-flash` | Free tier (Google AI Studio), cực nhanh, hỗ trợ JSON và context window cực lớn |
 | Embedding (free) | **BAAI/bge-m3** local | Multilingual Anh+Việt, dim=1024 |
 | Vector DB | **Qdrant** Docker local | Self-host, filter theo metadata |
 | Task Queue | **RabbitMQ** (via `aio-pika`) | Hàng đợi tin nhắn xử lý tác vụ sinh task/TC bất đồng bộ |
 
-> **100% free để chạy:** Groq free tier + local embedding + Qdrant, RabbitMQ & PostgreSQL local Docker. Không cần credit card.
+> **100% free để chạy:** Google Gemini free tier + local embedding + Qdrant, RabbitMQ & PostgreSQL local Docker. Không cần credit card.
 
 ---
 

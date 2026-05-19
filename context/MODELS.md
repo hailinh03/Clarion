@@ -48,13 +48,12 @@ Cần reasoning tốt, hiểu business context, output JSON chính xác.
 ### Free options ⭐
 | Model | Nguồn | Cách truy cập | Ghi chú |
 |---|---|---|---|
+| `gemini-2.5-flash` | Google | Google AI Studio (free tier) | ⭐ **Mặc định & Khuyến nghị chính thức** — Cực nhanh, hỗ trợ JSON cực chuẩn, context lớn |
 | `Qwen2.5-72B-Instruct` | HuggingFace | HF Inference API (free tier) | ⭐ Tốt nhất free cho reasoning |
 | `meta-llama/Llama-3.3-70B-Instruct` | HuggingFace | HF Inference API (free tier) | ⭐ Mạnh, follow instruction tốt |
-| `google/gemma-3-27b-it` | HuggingFace | HF Inference API (free tier) | Tốt cho tiếng Việt |
-| `mistralai/Mistral-7B-Instruct-v0.3` | Groq | Groq free tier (nhanh) | Nhẹ hơn nhưng rate limit cao |
 | `openai/gpt-oss-120b` | Groq | Groq free tier | Reasoning tốt |
 
-> **Khuyến nghị hiện tại:** `Qwen2.5-72B-Instruct` qua HuggingFace Inference API hoặc `openai/gpt-oss-120b` qua Groq (nhanh hơn).
+> **Khuyến nghị hiện tại:** `gemini-2.5-flash` qua Google AI Studio API (mặc định của dự án) hoặc `openai/gpt-oss-120b` qua Groq.
 
 ---
 
@@ -65,10 +64,10 @@ Prompt rõ ràng, schema cố định → không cần model quá mạnh, ưu ti
 ### Free options ⭐
 | Model | Nguồn | Ghi chú |
 |---|---|---|
+| `gemini-2.5-flash` | Google free | ⭐ **Mặc định & Khuyến nghị chính thức** — Rất nhanh, xuất JSON chuẩn xác |
 | `Qwen2.5-7B-Instruct` | HuggingFace / Groq | Nhanh, đủ dùng cho gen có cấu trúc |
 | `meta-llama/Llama-3.1-8B-Instruct` | Groq free | Rất nhanh |
 | `openai/gpt-oss-120b` | Groq free | Rất mạnh, support cấu trúc tốt |
-| `gemma-7b-it` | Groq free | Nhẹ, tốt cho JSON output |
 
 ---
 
