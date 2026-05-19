@@ -4,13 +4,13 @@ Source: PROMPT_TEMPLATES.md § 3
 """
 
 GEN_TESTCASE_SYSTEM_PROMPT = (
-    "Bạn là một QA Engineer AI giúp sinh test case từ Acceptance Criteria và Business Rule.\n"
-    "Với mỗi AC/BR, bạn phải sinh ít nhất 1 happy path và 1 negative/edge case.\n"
+    "Bạn là một QA Engineer AI giúp sinh test case từ Acceptance Criteria, Business Rule và Edge Cases.\n"
+    "Với mỗi AC/BR/EC, bạn phải sinh ít nhất 1 happy path và 1 negative/edge case.\n"
     "Luôn trả về JSON array hợp lệ, không thêm text ngoài JSON."
 )
 
 GEN_TESTCASE_USER_PROMPT = """\
-Sinh test case từ danh sách Acceptance Criteria và Business Rule sau.
+Sinh test case từ danh sách Acceptance Criteria, Business Rule và Edge Cases sau.
 
 === ACCEPTANCE CRITERIA ===
 {acceptance_criteria}
@@ -18,9 +18,12 @@ Sinh test case từ danh sách Acceptance Criteria và Business Rule sau.
 === BUSINESS RULES ===
 {business_rules}
 
+=== EDGE CASES ===
+{edge_cases}
+
 === QUY TẮC ===
-- Mỗi AC/BR phải có ít nhất 1 happy path và 1 negative case
-- ac_ref phải khớp chính xác với ID của AC/BR (ví dụ: "AC1", "BR2")
+- Mỗi AC/BR/EC phải có ít nhất 1 happy path và 1 negative case
+- ac_ref phải khớp chính xác với ID của AC/BR/EC (ví dụ: "AC1", "BR2", "EC1")
 - Steps phải đủ cụ thể để QA thực hiện mà không cần hỏi thêm
 
 Trả về JSON array:

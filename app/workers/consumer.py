@@ -72,7 +72,9 @@ async def handle_test_cases(message: aio_pika.IncomingMessage):
                 
                 # 2. Coverage check
                 ac_list = payload.get("acceptance_criteria", [])
-                coverage_report = coverage_check(ac_list, test_cases)
+                br_list = payload.get("business_rules", []) or None
+                ec_list = payload.get("edge_cases", []) or None
+                coverage_report = coverage_check(ac_list, test_cases, br_list, ec_list)
                 
                 # 3. Embed & Upsert
                 if test_cases:
@@ -90,7 +92,7 @@ async def handle_test_cases(message: aio_pika.IncomingMessage):
                             project_id=project_id,
                         )
                         
-                logger.info(f"[Consumer] Hoàn thành sinh {len(test_cases)} Test Cases, Coverage: {coverage_report['coverage_percentage']}%")
+                logger.info(f"[Consumer] Hoàn thành sinh {len(test_cases)} Test Cases, Overall Coverage: {coverage_report['overall_coverage_percentage']}%")
                 
                 result = await db.execute(select(TaskStatus).filter(TaskStatus.id == task_db_id))
                 task_record = result.scalars().first()

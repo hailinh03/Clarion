@@ -23,6 +23,7 @@ async def gen_test_cases(ticket_json: dict) -> List[TestCase]:
     prompt_input = {
         "acceptance_criteria": _join_list(ticket_json.get("acceptance_criteria", []), "Không có AC"),
         "business_rules": _join_list(ticket_json.get("business_rules", []), "Không có Business Rule"),
+        "edge_cases": _join_list(ticket_json.get("edge_cases", []), "Không có Edge Case"),
     }
     
     ticket_id = ticket_json.get("ticket_id", "unknown")
